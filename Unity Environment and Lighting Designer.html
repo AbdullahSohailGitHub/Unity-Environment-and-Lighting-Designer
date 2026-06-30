@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muhammad Awais — Unity Environment & Lighting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#0a0c11;
+    --bg-panel:#13161f;
+    --bg-panel-2:#181c27;
+    --key:#e8a857;
+    --key-dim:#a87a42;
+    --fill:#3d7a8c;
+    --fill-dim:#2a5560;
+    --text:#edeae3;
+    --text-muted:#8a8d99;
+    --line:rgba(237,234,227,0.09);
+    --display:'Space Grotesk',sans-serif;
+    --body:'Inter',sans-serif;
+    --mono:'JetBrains Mono',monospace;
+    --reveal:52%;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--bg-deep);color:var(--text);font-family:var(--body);overflow-x:hidden;line-height:1.5;}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;}}
+  a{color:inherit;}
+  ::selection{background:var(--key);color:#0a0c11;}
+
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:50;opacity:0.035;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .vignette{position:fixed;inset:0;pointer-events:none;z-index:40;background:radial-gradient(ellipse at 50% 25%, transparent 40%, rgba(0,0,0,0.55) 100%);}
+
+  section{position:relative;z-index:1;padding:clamp(70px,10vw,130px) 8vw;}
+  @media (max-width:760px){section{padding:64px 6vw;}}
+
+  .topbar{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;justify-content:space-between;align-items:center;
+    padding:22px 8vw;font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;
+    backdrop-filter:blur(10px);background:linear-gradient(to bottom, rgba(10,12,17,0.75), transparent);}
+  .topbar .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--key);margin-right:8px;box-shadow:0 0 8px var(--key);animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+
+  /* ---------- HERO ---------- */
+  .hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding-top:110px;}
+  .hero-content{position:relative;z-index:2;max-width:980px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:0.15em;text-transform:uppercase;color:var(--key);
+    margin-bottom:26px;display:flex;align-items:center;gap:10px;opacity:0;animation:fadeUp 0.8s ease forwards 0.1s;}
+  .eyebrow::before{content:'';width:28px;height:1px;background:var(--key);}
+  h1{font-family:var(--display);font-weight:600;font-size:clamp(2.3rem,5vw,4.3rem);line-height:1.07;letter-spacing:-0.01em;
+    max-width:15ch;opacity:0;animation:fadeUp 0.9s ease forwards 0.25s;}
+  h1 .accent{color:var(--key);font-style:italic;font-weight:500;}
+  .hero-sub{margin-top:24px;font-size:1.06rem;color:var(--text-muted);max-width:56ch;opacity:0;animation:fadeUp 0.9s ease forwards 0.4s;}
+  .hero-sub b{color:var(--text);font-weight:600;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+
+  /* ---------- compare slider (signature element) ---------- */
+  .compare-wrap{
+    margin-top:44px;position:relative;height:min(420px, 52vw);border-radius:10px;overflow:hidden;
+    border:1px solid var(--line);user-select:none;cursor:ew-resize;
+    opacity:0;animation:fadeUp 1s ease forwards 0.55s;
+    box-shadow:0 40px 80px -30px rgba(0,0,0,0.6);
+  }
+  .compare-layer{position:absolute;inset:0;}
+  .compare-layer canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  .compare-layer.lit{clip-path:inset(0 0 0 var(--reveal));}
+  .tag-pill{position:absolute;top:16px;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;
+    padding:7px 12px;border-radius:20px;backdrop-filter:blur(6px);display:flex;align-items:center;gap:6px;}
+  .tag-pill.raw{left:16px;background:rgba(20,22,28,0.6);color:var(--text-muted);border:1px solid var(--line);}
+  .tag-pill.lit-tag{right:16px;background:rgba(232,168,87,0.12);color:var(--key);border:1px solid var(--key-dim);}
+  .compare-handle{
+    position:absolute;top:0;bottom:0;left:var(--reveal);width:2px;background:var(--key);
+    transform:translateX(-1px);box-shadow:0 0 16px rgba(232,168,87,0.7);pointer-events:none;
+  }
+  .compare-knob{
+    position:absolute;top:50%;left:var(--reveal);transform:translate(-50%,-50%);
+    width:44px;height:44px;border-radius:50%;background:var(--key);
+    display:flex;align-items:center;justify-content:center;gap:3px;pointer-events:none;
+    box-shadow:0 6px 20px -4px rgba(0,0,0,0.6);
+  }
+  .compare-knob svg{width:14px;height:14px;}
+  .compare-caption{display:flex;justify-content:space-between;margin-top:14px;font-family:var(--mono);font-size:10.5px;
+    color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;opacity:0;animation:fadeUp 1s ease forwards 0.7s;}
+  .compare-caption span:first-child{color:var(--key);}
+
+  .hero-meta{margin-top:44px;display:flex;gap:44px;flex-wrap:wrap;opacity:0;animation:fadeUp 0.9s ease forwards 0.85s;}
+  .meta-item .num{font-family:var(--mono);font-size:1.6rem;color:var(--key);font-weight:500;}
+  .meta-item .label{font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:3px;}
+
+  /* ---------- reveal ---------- */
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity 0.8s ease, transform 0.8s ease;}
+  .reveal.in{opacity:1;transform:translateY(0);}
+
+  .section-head{display:flex;align-items:baseline;gap:18px;margin-bottom:52px;}
+  .section-head .tag{font-family:var(--mono);font-size:11px;color:var(--key);letter-spacing:0.15em;text-transform:uppercase;
+    border:1px solid var(--key-dim);padding:5px 11px;border-radius:3px;white-space:nowrap;}
+  .section-head h2{font-family:var(--display);font-size:clamp(1.4rem,2.5vw,2rem);font-weight:600;}
+  .section-head .rule{flex:1;height:1px;background:var(--line);}
+
+  .problem{max-width:760px;}
+  .problem p{font-size:1.1rem;color:var(--text-muted);margin-bottom:16px;}
+  .problem p b{color:var(--text);font-weight:600;}
+  .problem .highlight{font-family:var(--display);font-style:italic;font-weight:500;font-size:1.35rem;color:var(--text);
+    margin-top:26px;padding-left:22px;border-left:2px solid var(--key);}
+
+  /* ---------- proof grid ---------- */
+  .proof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);}
+  @media (max-width:900px){.proof-grid{grid-template-columns:1fr;}}
+  .proof-card{background:var(--bg-panel);padding:30px 28px;position:relative;overflow:hidden;transition:background 0.4s ease, transform 0.4s ease;}
+  .proof-card:hover{background:var(--bg-panel-2);transform:translateY(-3px);}
+  .proof-card .glow{position:absolute;top:-40%;right:-40%;width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle, var(--key) 0%, transparent 70%);opacity:0;transition:opacity 0.5s ease;filter:blur(20px);}
+  .proof-card:hover .glow{opacity:0.18;}
+  .proof-card .render{width:100%;height:150px;border-radius:6px;margin-bottom:20px;position:relative;overflow:hidden;
+    background:#0d0f15;border:1px solid var(--line);}
+  .proof-card .render canvas{width:100%;height:100%;display:block;}
+  .proof-card .ptitle{font-family:var(--display);font-weight:600;font-size:1.08rem;margin-bottom:7px;}
+  .proof-card .pdesc{font-size:0.9rem;color:var(--text-muted);margin-bottom:16px;}
+  .proof-card .pmeta{font-family:var(--mono);font-size:10px;color:var(--key);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:13px;}
+  .proof-card a.link{font-family:var(--mono);font-size:11.5px;color:var(--fill);text-decoration:none;
+    display:inline-flex;align-items:center;gap:6px;border-bottom:1px solid transparent;transition:border-color 0.3s ease, color 0.3s ease;}
+  .proof-card a.link:hover{color:var(--key);border-color:var(--key);}
+
+  /* ---------- process ---------- */
+  .passes{display:flex;flex-direction:column;border-top:1px solid var(--line);}
+  .pass{display:grid;grid-template-columns:56px 110px 1fr 150px;gap:26px;align-items:center;padding:28px 0;border-bottom:1px solid var(--line);}
+  @media (max-width:760px){.pass{grid-template-columns:40px 1fr;gap:14px;padding:20px 0;}
+    .pass .pmeter{grid-column:2;justify-self:start;margin-top:4px;}
+    .pass .pidx{display:none;}}
+  .pass-icon{width:40px;height:40px;border-radius:8px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg, rgba(232,168,87,0.06), transparent);}
+  .pass-icon svg{width:19px;height:19px;stroke:var(--key);fill:none;stroke-width:1.6;}
+  .pass .pidx{font-family:var(--mono);font-size:11px;color:var(--text-muted);letter-spacing:0.08em;}
+  .pass .pname{font-family:var(--display);font-weight:600;font-size:1.15rem;}
+  .pass .pbody{font-size:0.92rem;color:var(--text-muted);margin-top:5px;max-width:48ch;}
+  .pass .pmeter{justify-self:end;display:flex;align-items:center;gap:10px;}
+  .meter-track{width:120px;height:3px;background:var(--line);border-radius:2px;overflow:hidden;}
+  .meter-fill{height:100%;background:linear-gradient(90deg, var(--fill), var(--key));width:0%;transition:width 1.4s cubic-bezier(.2,.8,.2,1);}
+  .meter-label{font-family:var(--mono);font-size:10px;color:var(--text-muted);min-width:38px;}
+
+  /* ---------- stats ---------- */
+  .stats-strip{display:flex;justify-content:space-between;flex-wrap:wrap;gap:36px;padding:46px 8vw;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(232,168,87,0.03), transparent);}
+  .stat .n{font-family:var(--display);font-size:2.1rem;font-weight:700;color:var(--text);}
+  .stat .n .unit{font-size:1.05rem;color:var(--key);}
+  .stat .l{font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;}
+
+  /* ---------- CTA ---------- */
+  .cta{max-width:760px;}
+  .cta h2{font-family:var(--display);font-size:clamp(1.7rem,3.4vw,2.6rem);font-weight:600;line-height:1.15;margin-bottom:22px;}
+  .cta h2 .accent{color:var(--key);font-style:italic;font-weight:500;}
+  .question-card{margin-top:34px;padding:24px 26px;border:1px solid var(--key-dim);border-radius:8px;
+    background:linear-gradient(135deg, rgba(232,168,87,0.06), transparent);display:flex;gap:16px;align-items:flex-start;}
+  .question-card .qmark{font-family:var(--display);font-size:1.9rem;color:var(--key);line-height:1;font-style:italic;}
+  .question-card p{font-size:1rem;color:var(--text);}
+  .cta-row{margin-top:36px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;}
+  .btn{font-family:var(--mono);font-size:12.5px;letter-spacing:0.08em;text-transform:uppercase;padding:16px 30px;border-radius:4px;
+    text-decoration:none;display:inline-block;background:var(--key);color:#0a0c11;font-weight:600;
+    transition:transform 0.3s ease, box-shadow 0.3s ease;}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px -10px rgba(232,168,87,0.5);}
+  .btn-ghost{font-family:var(--mono);font-size:12.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);
+    border-bottom:1px solid var(--line);padding-bottom:4px;}
+
+  footer{padding:38px 8vw;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;
+    font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;}
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="vignette"></div>
+
+<div class="topbar">
+  <div><span class="dot"></span>Unity Environment &amp; Lighting</div>
+  <div>Proposal / Muhammad Awais</div>
+</div>
+
+<section class="hero">
+  <div class="hero-content">
+    <div class="eyebrow">Blender scene received → ready to light</div>
+    <h1>Your environment is modeled.<br>Let's make it <span class="accent">feel real</span> inside Unity.</h1>
+    <p class="hero-sub">Drag the line below — same scene, same geometry. The only difference is the lighting and post-processing pass, which is exactly the part of this job you're hiring for.</p>
+
+    <div class="compare-wrap" id="compareWrap">
+      <div class="compare-layer raw">
+        <canvas id="canvasRaw"></canvas>
+        <div class="tag-pill raw">Raw Blender Import</div>
+      </div>
+      <div class="compare-layer lit">
+        <canvas id="canvasLit"></canvas>
+        <div class="tag-pill lit-tag">Lit + Graded in Unity</div>
+      </div>
+      <div class="compare-handle"></div>
+      <div class="compare-knob">
+        <svg viewBox="0 0 24 24" stroke="#0a0c11" stroke-width="2" fill="none" stroke-linecap="round"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg>
+      </div>
+    </div>
+    <div class="compare-caption"><span>← drag to compare</span><span>same mesh, different pass</span></div>
+
+    <div class="hero-meta">
+      <div class="meta-item"><div class="num">7+</div><div class="label">Years in Unity</div></div>
+      <div class="meta-item"><div class="num">20+</div><div class="label">Shipped titles</div></div>
+      <div class="meta-item"><div class="num">&lt;1mo</div><div class="label">Your timeline, no problem</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="problem-section">
+  <div class="section-head reveal">
+    <span class="tag">The Brief</span>
+    <h2>What you actually asked for</h2>
+    <div class="rule"></div>
+  </div>
+  <div class="problem reveal">
+    <p>You've got a Blender file with the space already designed. What's missing is the Unity-side craft: <b>import and scene setup, realistic lighting, light baking, post-processing, and material/shader optimization</b> — the layer that turns a 3D model into something that feels like a real, lived-in place.</p>
+    <p>That gap between "modeled" and "immersive" is exactly where environment and lighting work earns its keep, and it's the part of game development I've spent the last seven years inside of.</p>
+    <p class="highlight">Rather than tell you I can do this — here's proof, three live projects, same kind of problem.</p>
+  </div>
+</section>
+
+<section class="proof-section">
+  <div class="section-head reveal">
+    <span class="tag">Proof</span>
+    <h2>Environments I've built and shipped</h2>
+    <div class="rule"></div>
+  </div>
+  <div class="proof-grid reveal">
+    <div class="proof-card">
+      <div class="glow"></div>
+      <div class="render"><canvas class="proof-canvas" data-seed="1"></canvas></div>
+      <div class="pmeta">Mobile · Environment Layout</div>
+      <div class="ptitle">Car Parking Jam</div>
+      <div class="pdesc">Full scene composition and environment layout for a parking-puzzle world — readable depth and spatial clarity on mobile hardware.</div>
+      <a class="link" href="https://play.google.com/store/apps/details?id=com.car.parking.jam.offline.games.traffic.puzzle&hl=en" target="_blank">View on Google Play →</a>
+    </div>
+    <div class="proof-card">
+      <div class="glow"></div>
+      <div class="render"><canvas class="proof-canvas" data-seed="2"></canvas></div>
+      <div class="pmeta">Mobile · Lighting + FX</div>
+      <div class="ptitle">Stunt Driving — Ramp Racing</div>
+      <div class="pdesc">Detailed 3D environments with directional lighting and atmospheric effects tuned for high-speed visual clarity.</div>
+      <a class="link" href="https://play.google.com/store/apps/details?id=com.car.stunt.driving.cargames.offline.ramp.racing&hl=en" target="_blank">View on Google Play →</a>
+    </div>
+    <div class="proof-card">
+      <div class="glow"></div>
+      <div class="render"><canvas class="proof-canvas" data-seed="3"></canvas></div>
+      <div class="pmeta">Mobile · Post-Processing</div>
+      <div class="ptitle">Frontline Elite War</div>
+      <div class="pdesc">Atmospheric environment design with bloom, color grading, and ambient occlusion tuned for a battlefield mood.</div>
+      <a class="link" href="https://play.google.com/store/apps/details?id=com.lf.frontline.elite.war.free.apps" target="_blank">View on Google Play →</a>
+    </div>
+  </div>
+</section>
+
+<div class="stats-strip reveal">
+  <div class="stat"><div class="n">20<span class="unit">+</span></div><div class="l">Titles with environment &amp; lighting work</div></div>
+  <div class="stat"><div class="n">7<span class="unit">yrs</span></div><div class="l">Unity production experience</div></div>
+  <div class="stat"><div class="n">URP<span class="unit">/HDRP</span></div><div class="l">Comfortable in both pipelines</div></div>
+  <div class="stat"><div class="n">100<span class="unit">%</span></div><div class="l">Ready to start on your file today</div></div>
+</div>
+
+<section class="process-section">
+  <div class="section-head reveal">
+    <span class="tag">The Plan</span>
+    <h2>How your scene gets lit</h2>
+    <div class="rule"></div>
+  </div>
+  <div class="passes reveal">
+    <div class="pass">
+      <div class="pass-icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></div>
+      <div class="pidx">PASS 01</div>
+      <div><div class="pname">Import &amp; Scene Setup</div><div class="pbody">Bring your Blender file into Unity cleanly — correct scale, pivots, collision, and folder structure so the scene is easy to iterate on.</div></div>
+      <div class="pmeter"><div class="meter-track"><div class="meter-fill" data-fill="25"></div></div><div class="meter-label">DAY 1</div></div>
+    </div>
+    <div class="pass">
+      <div class="pass-icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></div>
+      <div class="pidx">PASS 02</div>
+      <div><div class="pname">Lighting &amp; Baking</div><div class="pbody">Set up realistic directional and ambient lighting, bake static lightmaps where it counts, and balance exposure so the space reads correctly.</div></div>
+      <div class="pmeter"><div class="meter-track"><div class="meter-fill" data-fill="55"></div></div><div class="meter-label">DAY 2–3</div></div>
+    </div>
+    <div class="pass">
+      <div class="pass-icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/></svg></div>
+      <div class="pidx">PASS 03</div>
+      <div><div class="pname">Post-Processing</div><div class="pbody">Bloom, color grading, ambient occlusion, and depth of field tuned to your art direction — not the default profile.</div></div>
+      <div class="pmeter"><div class="meter-track"><div class="meter-fill" data-fill="80"></div></div><div class="meter-label">DAY 3–4</div></div>
+    </div>
+    <div class="pass">
+      <div class="pass-icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M7 19V9m5 10V5m5 14v-7"/></svg></div>
+      <div class="pidx">PASS 04</div>
+      <div><div class="pname">Optimization &amp; Handoff</div><div class="pbody">Material and shader cleanup for performance, a final pass for visual consistency, and a documented handoff of the scene.</div></div>
+      <div class="pmeter"><div class="meter-track"><div class="meter-fill" data-fill="100"></div></div><div class="meter-label">DAY 5</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="cta reveal">
+    <h2>Send the Blender file — <span class="accent">I'll start today.</span></h2>
+    <p style="color:var(--text-muted);font-size:1.03rem;">No ramp-up needed. The workflow above is the same one used across 20+ shipped titles, just pointed at your scene.</p>
+    <div class="question-card">
+      <div class="qmark">?</div>
+      <p>One question before we start — are you targeting <b style="color:var(--key);">realistic visuals, a stylized look, or a lean optimized build</b> for mobile? That decision shapes the lighting and post-processing approach from pass one.</p>
+    </div>
+    <div class="cta-row">
+      <a class="btn" href="https://www.upwork.com/freelancers/~01b9267db3749d2001" target="_blank">Reply &amp; Send the File</a>
+      <span class="btn-ghost">Available to start within 24 hours</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>Muhammad Awais — Unity Developer</div>
+  <div>Prepared for: Unity Environment &amp; Lighting Designer role</div>
+</footer>
+
+<script>
+  // ---------- scroll reveal ----------
+  const revealEls = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        e.target.classList.add('in');
+        if(e.target.classList.contains('passes')){
+          e.target.querySelectorAll('.meter-fill').forEach(m=>{
+            setTimeout(()=>{ m.style.width = m.dataset.fill + '%'; }, 200);
+          });
+        }
+        io.unobserve(e.target);
+      }
+    });
+  },{threshold:0.18});
+  revealEls.forEach(el=>io.observe(el));
+
+  // ---------- shared environment renderer ----------
+  function makeBlocks(w, h, seed){
+    let s = seed * 9301 + 49297;
+    function rand(){ s = (s * 9301 + 49297) % 233280; return s/233280; }
+    const count = 7;
+    const blocks = [];
+    for(let i=0;i<count;i++){
+      blocks.push({
+        x: (w/count) * i + (w/count)*0.5 + (rand()-0.5)*(w/count)*0.4,
+        width: (w/count) * (0.45 + rand()*0.35),
+        height: h*0.18 + rand()*h*0.55,
+      });
+    }
+    return blocks;
+  }
+
+  function drawEnv(ctx, w, h, blocks, lit, lightXRatio){
+    ctx.clearRect(0,0,w,h);
+    const baseY = h*0.82;
+    const lightX = w * lightXRatio;
+    const lightY = h * 0.12;
+
+    if(lit){
+      const sky = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, w*0.85);
+      sky.addColorStop(0, 'rgba(232,168,87,0.22)');
+      sky.addColorStop(0.45, 'rgba(61,122,140,0.08)');
+      sky.addColorStop(1, 'rgba(10,12,17,0)');
+      ctx.fillStyle = '#0d0f15';
+      ctx.fillRect(0,0,w,h);
+      ctx.fillStyle = sky;
+      ctx.fillRect(0,0,w,h);
+    } else {
+      ctx.fillStyle = '#1c1d20';
+      ctx.fillRect(0,0,w,h);
+      // flat fluorescent ambient, faint grid to suggest "unlit viewport"
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      for(let gx=0; gx<w; gx+=24){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke(); }
+      for(let gy=0; gy<h; gy+=24){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(w,gy); ctx.stroke(); }
+    }
+
+    // ground
+    if(lit){
+      const g = ctx.createLinearGradient(0,baseY-10,0,h);
+      g.addColorStop(0,'rgba(19,22,31,0)');
+      g.addColorStop(1,'rgba(8,9,13,0.95)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0,baseY-10,w,h-(baseY-10));
+    } else {
+      ctx.fillStyle = '#222326';
+      ctx.fillRect(0,baseY-6,w,h-(baseY-6));
+    }
+
+    blocks.forEach((b)=>{
+      if(lit){
+        const dist = Math.abs(b.x - lightX);
+        const litAmount = Math.max(0, 1 - dist / (w*0.7));
+        const shadowLen = (b.x - lightX) * 0.22;
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath();
+        ctx.ellipse(b.x + shadowLen, baseY+3, b.width*0.55+Math.abs(shadowLen)*0.25, 7, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        const r = 26 + litAmount*205, g2 = 28 + litAmount*150, bl = 34 + litAmount*70;
+        ctx.fillStyle = `rgb(${r|0},${g2|0},${bl|0})`;
+        ctx.fillRect(b.x-b.width/2, baseY-b.height, b.width, b.height);
+
+        if(litAmount > 0.1){
+          ctx.fillStyle = `rgba(232,168,87,${litAmount*0.55})`;
+          const edgeX = b.x < lightX ? b.x + b.width/2 - 2 : b.x - b.width/2;
+          ctx.fillRect(edgeX, baseY-b.height, 2, b.height);
+        }
+        // top highlight
+        ctx.fillStyle = `rgba(255,235,210,${0.05 + litAmount*0.15})`;
+        ctx.fillRect(b.x-b.width/2, baseY-b.height, b.width, 3);
+      } else {
+        ctx.fillStyle = '#2c2d31';
+        ctx.fillRect(b.x-b.width/2, baseY-b.height, b.width, b.height);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(b.x-b.width/2, baseY-b.height, b.width, b.height);
+      }
+    });
+
+    if(lit){
+      ctx.fillStyle = 'rgba(232,168,87,0.95)';
+      ctx.beginPath(); ctx.arc(lightX, lightY, 4, 0, Math.PI*2); ctx.fill();
+      // vignette
+      const vg = ctx.createRadialGradient(w/2,h/2,h*0.3,w/2,h/2,h*0.9);
+      vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.35)');
+      ctx.fillStyle = vg; ctx.fillRect(0,0,w,h);
+    }
+  }
+
+  function setupCompare(){
+    const wrap = document.getElementById('compareWrap');
+    const rawC = document.getElementById('canvasRaw');
+    const litC = document.getElementById('canvasLit');
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    let w, h, blocks;
+
+    function resize(){
+      w = wrap.clientWidth; h = wrap.clientHeight;
+      [rawC, litC].forEach(c=>{ c.width = w*dpr; c.height = h*dpr; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); });
+      blocks = makeBlocks(w, h, 7);
+      render();
+    }
+    function render(){
+      drawEnv(rawC.getContext('2d'), w, h, blocks, false, 0.62);
+      drawEnv(litC.getContext('2d'), w, h, blocks, true, 0.62);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let dragging = false;
+    function setReveal(clientX){
+      const rect = wrap.getBoundingClientRect();
+      let pct = ((clientX - rect.left) / rect.width) * 100;
+      pct = Math.max(4, Math.min(96, pct));
+      wrap.style.setProperty('--reveal', pct + '%');
+    }
+    wrap.addEventListener('pointerdown', (e)=>{ dragging = true; setReveal(e.clientX); });
+    window.addEventListener('pointermove', (e)=>{ if(dragging) setReveal(e.clientX); });
+    window.addEventListener('pointerup', ()=> dragging = false);
+
+    // intro hint sweep
+    setTimeout(()=>{
+      wrap.style.transition = 'none';
+      let p = 52;
+      wrap.style.setProperty('--reveal', p+'%');
+      let dir = 1, steps = 0;
+      const iv = setInterval(()=>{
+        p += dir*1.1; steps++;
+        if(p>72){dir=-1;} if(p<32){dir=1;}
+        wrap.style.setProperty('--reveal', p+'%');
+        if(steps>70){ clearInterval(iv); wrap.style.setProperty('--reveal','52%'); }
+      }, 16);
+    }, 900);
+  }
+  setupCompare();
+
+  // ---------- proof card renders ----------
+  function setupProofRenders(){
+    document.querySelectorAll('.proof-canvas').forEach(c=>{
+      const parent = c.parentElement;
+      const dpr = Math.min(window.devicePixelRatio||1, 2);
+      function resize(){
+        const w = parent.clientWidth, h = parent.clientHeight;
+        c.width = w*dpr; c.height = h*dpr;
+        c.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+        const seed = parseInt(c.dataset.seed,10);
+        const blocks = makeBlocks(w,h,seed);
+        drawEnv(c.getContext('2d'), w, h, blocks, true, 0.3 + seed*0.18);
+      }
+      window.addEventListener('resize', resize);
+      resize();
+    });
+  }
+  setupProofRenders();
+</script>
+
+</body>
+</html>
